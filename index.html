@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Station Groups</title>
+<style>
+:root{--bg:#f3f6f4;--ink:#1d2b33;--mut:#5d6d75;--card:#fff;--line:#cfd9d4;--group:#2f7d6b;--individual:#c2571a;--pair:#3b5bb5;--triplet:#8a4fb0;--chip:#eef3f0}
+@media (prefers-color-scheme:dark){:root{--bg:#141b1f;--ink:#e6eeea;--mut:#9aabb2;--card:#1d272d;--line:#33434b;--chip:#273740}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 "Avenir Next","Segoe UI",system-ui,sans-serif}
+header{padding:16px 20px 8px}
+h1{margin:0 0 10px;font-size:1.5rem}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}button:hover{border-color:var(--ink)}
+button.go{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:focus-visible{outline:3px solid var(--pair);outline-offset:1px}
+main{padding:8px 20px 30px}
+details{margin-bottom:14px}summary{cursor:pointer;font-weight:600;padding:4px 0}
+textarea{width:100%;min-height:150px;margin:6px 0;padding:10px;font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+.hint{color:var(--mut);font-size:.9rem;margin:0}
+#board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;overflow-x:auto;align-items:start;padding-bottom:8px}
+.col{background:var(--card);border:1px solid var(--line);border-top:5px solid var(--c);border-radius:8px;min-height:200px}
+.col.group{--c:var(--group)}.col.individual{--c:var(--individual)}.col.pair{--c:var(--pair)}.col.triplet{--c:var(--triplet)}
+.head{display:flex;flex-wrap:wrap;gap:6px;padding:10px;border-bottom:1px solid var(--line)}
+.head input{flex:1 1 100px;min-width:0;font-weight:600}
+.head select{flex:1 1 80px}
+.head .x{padding:6px 9px}
+.count{width:100%;color:var(--mut);font-size:.85rem}
+.body{padding:8px;min-height:120px;display:flex;flex-direction:column;gap:6px}
+.team{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:6px}
+.col.pair .team,.col.group .team,.col.triplet .team{border:1.5px solid var(--c)}
+.nmonly{display:none!important}body.nm .nmonly{display:flex!important}body.nm .plain{display:none}
+.chk{display:flex;gap:6px;align-items:center}.np{margin-top:8px;gap:8px;flex-wrap:wrap;align-items:center}
+.np label{display:flex;gap:6px;align-items:center;flex:1 1 260px}.np input{flex:1;min-width:0}
+.tm{padding:6px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:4px;background:var(--bg)}
+.tname{font-weight:600;font-size:.9rem;color:var(--mut)}
+.grip{cursor:grab;color:var(--mut);padding:6px 4px;user-select:none}
+.col.over{outline:2px dashed var(--ink)}
+.chip{background:var(--chip);border:1px solid var(--line);border-radius:5px;padding:4px 9px;cursor:grab;user-select:none}
+.chip.drag{opacity:.4}
+.body.over{background:var(--chip)}
+.empty{color:var(--mut);font-size:.9rem;padding:20px}
+@media print{header,details{display:none}}
+.tp{margin-top:8px;gap:10px;flex-wrap:wrap;align-items:center}
+.tp label{display:flex;gap:6px;align-items:center}
+#clock{font:700 2rem/1 ui-monospace,Menlo,monospace;min-width:4.5ch;font-variant-numeric:tabular-nums}
+#flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:50;background:#ffd23f}
+#flash.on{animation:fl 2.4s ease-out}
+@keyframes fl{0%,100%{opacity:0}8%{opacity:.8}25%{opacity:0}42%{opacity:.8}58%{opacity:0}75%{opacity:.8}92%{opacity:0}}
+#rot{position:fixed;inset:0;z-index:60;background:rgba(10,20,25,.82);display:none;align-items:center;justify-content:center;padding:20px}
+#rot.show{display:flex}
+#rot .card{background:var(--card);border-radius:12px;padding:20px 24px;max-width:600px;width:100%;max-height:90vh;overflow:auto}
+#rot h2{margin:0 0 12px;font-size:1.6rem}
+#rotList{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px}
+#rotList li{display:grid;grid-template-columns:1fr 1fr auto 1fr;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:1.1rem;opacity:0;animation:slide .5s ease-out forwards}
+#rotList i{font-style:normal;color:var(--individual);font-size:1.5rem;animation:nudge 1s ease-in-out infinite}
+@keyframes slide{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@keyframes nudge{50%{transform:translateX(6px)}}
+.tm.moved{animation:pop .9s ease-out}
+@keyframes pop{0%{transform:scale(.9);box-shadow:0 0 0 0 var(--individual)}50%{transform:scale(1.04)}100%{transform:none;box-shadow:0 0 0 12px transparent}}
+@media (prefers-reduced-motion:reduce){#flash.on{animation:fl2 1.5s}@keyframes fl2{0%,100%{opacity:0}30%{opacity:.3}}#rotList li{animation:none;opacity:1}#rotList i,.tm.moved{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Station Groups</h1>
+  <div class="bar">
+    <select id="cls" aria-label="Class"></select>
+    <label class="plain">Stations <input id="n" type="number" min="1" max="8" style="width:4.5em"></label>
+    <label class="chk"><input type="checkbox" id="named"> Named teams and stations</label>
+    <span class="nmonly" style="gap:8px"><button id="prev">‹ Previous station</button><button id="next" class="go">Next station ›</button></span>
+    <button id="shuf" class="go">Shuffle students</button>
+    <button id="print">Print</button>
+    <button id="del">Delete class</button>
+  </div>
+  <div class="np nmonly">
+    <label>Teams <input id="tn" placeholder="Team A, Team B, Team C"></label>
+    <label>Stations <input id="sn" placeholder="Station 1, Station 2, Station 3, Station 4"></label>
+    <button id="apply">Apply names</button>
+  </div>
+  <div class="tp nmonly">
+    <span id="clock" aria-live="off">5:00</span>
+    <button id="tgo" class="go">Start</button><button id="trs">Reset</button>
+    <label>Minutes <input id="mins" type="number" min="0.5" step="0.5" value="5" style="width:5em"></label>
+    <label title="Station numbers in the order teams travel, e.g. 1, 2, 3, 4 or 1, 3, 2, 4">Rotation order <input id="ord" style="width:9em"></label>
+    <label class="chk"><input type="checkbox" id="rep" checked> Repeat</label>
+    <label class="chk"><input type="checkbox" id="snd" checked> Sound</label>
+    <select id="skind" aria-label="Alarm sound"></select>
+    <button id="stest">Test sound</button>
+    <label class="chk"><input type="checkbox" id="sloop"> Keep playing until I stop it</label>
+    <button id="astop" class="go" hidden>Stop sound</button>
+  </div>
+</header>
+<main>
+  <details id="setup" open>
+    <summary>Class lists</summary>
+    <p class="hint">Put the class name on the first line of each list. Leave a blank line between classes. One student per line.</p>
+    <textarea id="txt" placeholder="Period 1&#10;Ana&#10;Ben&#10;Carla&#10;&#10;Period 2&#10;Dev&#10;Eli&#10;Fay"></textarea>
+    <button id="load" class="go">Save classes</button>
+  </details>
+  <div id="board"></div>
+</main>
+<div id="flash"></div>
+<div id="rot" role="alertdialog" aria-label="Rotate stations"><div class="card"><h2>Rotate!</h2><ul id="rotList"></ul><button id="rotx" class="go">OK</button></div></div>
+<script>
+const KEY='stationGroups.v1';
+let S={classes:{},current:null};
+try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.classes)S=d}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const uid=()=>Math.random().toString(36).slice(2,8);
+const TYPES=['individual','pair','triplet','group'];
+const cap=k=>k[0].toUpperCase()+k.slice(1);
+const DEF=()=>[{name:'Group',type:'group',members:[]},{name:'Individual',type:'individual',members:[]},{name:'Pair',type:'pair',members:[]}];
+const cur=()=>S.classes[S.current];
+const sts=c=>c.named?c.nm.stations:c.stations;
+let dragName=null,dragSt=null;
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function distribute(c){
+  const n=c.stations.length;c.stations.forEach(s=>s.members=[]);
+  shuffle([...c.students]).forEach((x,i)=>c.stations[i%n].members.push(x));
+}
+function teams(type,m){
+  if(!m.length)return[];
+  if(type==='group')return[m];
+  const size=type==='individual'?1:type==='pair'?2:3;
+  const t=[];for(let i=0;i<m.length;i+=size)t.push(m.slice(i,i+size));
+  const l=t[t.length-1];
+  if(t.length>1&&l.length===1){
+    if(size===2)t[t.length-2].push(t.pop()[0]);
+    else if(size===3)l.unshift(t[t.length-2].pop());
+  }
+  return t;
+}
+function initNamed(c){
+  if(c.nm)return;
+  c.nm={teams:['Team A','Team B','Team C'].map(n=>({name:n,members:[],at:null})),
+    stations:TYPES.map((t,i)=>({id:uid(),name:'Station '+(i+1),type:t}))};
+  splitTeams(c);
+}
+function place(c){const A=c.nm.stations;c.nm.teams.forEach((t,i)=>t.at=A[i%A.length].id)}
+function splitTeams(c){
+  const T=c.nm.teams;T.forEach(t=>t.members=[]);
+  shuffle([...c.students]).forEach((x,i)=>T[i%T.length].members.push(x));
+  place(c);
+}
+function orderNums(c){
+  const n=c.nm.stations.length,raw=(c.nm.order||'').trim();
+  const v=(/^\d+$/.test(raw)&&n<10?raw.split(''):raw.split(/[,\s]+/).filter(Boolean)).map(Number);
+  return v.length&&v.every((x,i)=>Number.isInteger(x)&&x>=1&&x<=n&&v.indexOf(x)===i)?v:null;
+}
+function orderIds(c){const A=c.nm.stations;return(orderNums(c)||A.map((_,i)=>i+1)).map(x=>A[x-1].id)}
+function rotate(c,d){
+  const ids=orderIds(c),n=ids.length,moves=[];
+  c.nm.teams.forEach(t=>{
+    const i=ids.indexOf(t.at);if(i<0)return;
+    const to=ids[(i+d+n)%n];moves.push({team:t.name,from:t.at,to});t.at=to;
+  });
+  return moves;
+}
+function applyNames(){
+  const c=cur();if(!c||!c.named)return;
+  const sp=v=>v.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  const tn=sp($('tn').value),sn=sp($('sn').value);
+  if(!tn.length||!sn.length)return;
+  const m=c.nm,old=m.teams.length;
+  m.teams=tn.map((n,i)=>m.teams[i]?{...m.teams[i],name:n}:{name:n,members:[],at:null});
+  m.stations=sn.map((n,i)=>m.stations[i]?{...m.stations[i],name:n}:{id:uid(),name:n,type:'pair'});
+  if(tn.length!==old)splitTeams(c);
+  else{const ids=new Set(m.stations.map(s=>s.id));if(m.teams.some(t=>!ids.has(t.at)))place(c)}
+  save();render();
+}
+function parse(text){
+  return text.split(/\n\s*\n/).map(b=>b.split('\n').map(s=>s.trim()).filter(Boolean)).filter(l=>l.length).map(l=>{
+    const seen={};
+    const students=l.slice(1).map(n=>{seen[n]=(seen[n]||0)+1;return seen[n]>1?`${n} (${seen[n]})`:n});
+    return{name:l[0].replace(/^#+\s*/,''),students};
+  });
+}
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+const chips=g=>g.map(n=>`<span class="chip" draggable="true" data-n="${esc(n)}">${esc(n)}</span>`).join('');
+const teamBoxes=(type,m)=>teams(type,m).map(g=>`<div class="team">${chips(g)}</div>`).join('');
+
+function col(c,s,i){
+  let body,count;
+  if(c.named){
+    const here=c.nm.teams.filter(t=>t.at===s.id);
+    count=here.length?here.map(t=>esc(t.name)).join(', '):'Empty';
+    body=here.map(t=>`<div class="tm${MOVED.has(t.name)?' moved':''}" data-t="${c.nm.teams.indexOf(t)}"><div class="tname">${esc(t.name)}</div>${teamBoxes(s.type,t.members)}</div>`).join('')||'<p class="empty">No team here</p>';
+  }else{
+    count=`${s.members.length} students`+(s.type==='pair'?`, ${teams('pair',s.members).length} teams`:'');
+    body=teamBoxes(s.type,s.members);
+  }
+  return`<section class="col ${s.type}" data-col="${i}"><div class="head">
+    <span class="grip" draggable="true" data-grip="${i}" title="Drag to move this station">⠿</span>
+    <input data-i="${i}" data-f="name" value="${esc(s.name)}" aria-label="Station name">
+    <select data-i="${i}" data-f="type" aria-label="Station type">${TYPES.map(k=>`<option value="${k}" ${k===s.type?'selected':''}>${cap(k)}</option>`).join('')}</select>
+    <button class="x" data-mv="-1" data-i="${i}" title="Move left" aria-label="Move station left">‹</button>
+    <button class="x" data-mv="1" data-i="${i}" title="Move right" aria-label="Move station right">›</button>
+    <button class="x" data-rm="${i}" title="Remove station" aria-label="Remove station">✕</button>
+    <span class="count">${count}</span></div>
+    <div class="body" data-i="${i}" data-sid="${s.id||''}">${body}</div></section>`;
+}
+
+function render(){
+  const names=Object.keys(S.classes);
+  $('cls').innerHTML=names.map(n=>`<option ${n===S.current?'selected':''}>${esc(n)}</option>`).join('')||'<option>No classes yet</option>';
+  const c=cur(),b=$('board');
+  document.body.classList.toggle('nm',!!(c&&c.named));
+  $('named').checked=!!(c&&c.named);
+  if(!c){b.innerHTML='<p class="empty">Paste your class lists above and choose Save classes.</p>';$('n').value='';return}
+  if(c.named){$('tn').value=c.nm.teams.map(t=>t.name).join(', ');$('sn').value=c.nm.stations.map(s=>s.name).join(', ');$('ord').value=c.nm.order||'';$('ord').placeholder=c.nm.stations.map((_,i)=>i+1).join(', ');$('mins').value=c.nm.mins||5}
+  else $('n').value=c.stations.length;
+  b.innerHTML=sts(c).map((s,i)=>col(c,s,i)).join('');
+}
+
+function insert(m,name,before){const i=before?m.indexOf(before):-1;if(i>=0)m.splice(i,0,name);else m.push(name)}
+function moveSt(from,to){const a=sts(cur());a.splice(to,0,a.splice(from,1)[0]);save();render()}
+
+const board=$('board');
+board.addEventListener('dragstart',e=>{
+  const g=e.target.closest('.grip');
+  if(g){dragSt=+g.dataset.grip;e.dataTransfer.setData('text/plain','station');e.dataTransfer.effectAllowed='move';e.dataTransfer.setDragImage(g.closest('.col'),20,20);return}
+  const ch=e.target.closest('.chip');if(!ch)return;
+  dragName=ch.dataset.n;e.dataTransfer.setData('text/plain',dragName);e.dataTransfer.effectAllowed='move';ch.classList.add('drag');
+});
+board.addEventListener('dragend',()=>{dragName=null;dragSt=null;render()});
+board.addEventListener('dragover',e=>{
+  if(dragSt!==null){const c=e.target.closest('.col');if(c){e.preventDefault();c.classList.add('over')}return}
+  const b=e.target.closest('.body');if(b&&dragName){e.preventDefault();b.classList.add('over')}
+});
+board.addEventListener('dragleave',e=>{const x=e.target.closest('.col,.body');if(x)x.classList.remove('over')});
+board.addEventListener('drop',e=>{
+  if(dragSt!==null){
+    const col=e.target.closest('.col');if(!col)return;e.preventDefault();
+    const from=dragSt;dragSt=null;moveSt(from,+col.dataset.col);return;
+  }
+  const b=e.target.closest('.body');if(!b||!dragName)return;e.preventDefault();
+  const c=cur(),ch=e.target.closest('.chip'),name=dragName;dragName=null;
+  const before=ch&&ch.dataset.n!==name?ch.dataset.n:null;
+  if(c.named){
+    const tm=e.target.closest('.tm');let ti=tm?+tm.dataset.t:-1;
+    if(ti<0){const here=c.nm.teams.filter(t=>t.at===b.dataset.sid);if(here.length===1)ti=c.nm.teams.indexOf(here[0]);else{render();return}}
+    c.nm.teams.forEach(t=>t.members=t.members.filter(x=>x!==name));
+    insert(c.nm.teams[ti].members,name,before);
+  }else{
+    c.stations.forEach(s=>s.members=s.members.filter(x=>x!==name));
+    insert(c.stations[+b.dataset.i].members,name,before);
+  }
+  save();render();
+});
+board.addEventListener('change',e=>{
+  const f=e.target.dataset.f;if(!f)return;
+  sts(cur())[+e.target.dataset.i][f]=e.target.value;save();render();
+});
+board.addEventListener('click',e=>{
+  const mv=e.target.closest('[data-mv]');
+  if(mv){const i=+mv.dataset.i,j=i+ +mv.dataset.mv;if(j>=0&&j<sts(cur()).length)moveSt(i,j);return}
+  const rm=e.target.closest('[data-rm]');if(!rm)return;
+  const c=cur(),a=sts(c);if(a.length<2)return;
+  const [gone]=a.splice(+rm.dataset.rm,1);
+  if(c.named)c.nm.teams.forEach(t=>{if(t.at===gone.id)t.at=a[0].id});
+  else gone.members.forEach(m=>a[0].members.push(m));
+  save();render();
+});
+
+$('cls').onchange=e=>{S.current=e.target.value;save();render();resetTimer()};
+$('named').onchange=e=>{
+  const c=cur();if(!c){e.target.checked=false;return}
+  c.named=e.target.checked;if(c.named)initNamed(c);save();render();resetTimer();
+};
+$('prev').onclick=()=>doRotate(-1);
+$('next').onclick=()=>doRotate(1);
+$('apply').onclick=applyNames;
+$('n').onchange=e=>{
+  const c=cur();if(!c||c.named)return;
+  const n=Math.max(1,Math.min(8,+e.target.value||1));
+  while(c.stations.length<n)c.stations.push({name:'Station '+(c.stations.length+1),type:'individual',members:[]});
+  c.stations.length=n;
+  distribute(c);save();render();
+};
+$('shuf').onclick=()=>{const c=cur();if(!c)return;if(c.named)splitTeams(c);else distribute(c);save();render()};
+$('print').onclick=()=>window.print();
+$('del').onclick=()=>{
+  if(!S.current||!confirm(`Delete "${S.current}"?`))return;
+  delete S.classes[S.current];S.current=Object.keys(S.classes)[0]||null;save();render();
+};
+$('load').onclick=()=>{
+  const list=parse($('txt').value);if(!list.length)return;
+  list.forEach(({name,students})=>{
+    const c=S.classes[name]||(S.classes[name]={students:[],stations:DEF()});
+    c.students=students;distribute(c);if(c.nm)splitTeams(c);
+  });
+  S.current=list[0].name;save();render();
+  $('txt').value='';$('setup').open=false;
+};
+
+/* ---- timer, sound, flash, rotation animation ---- */
+let MOVED=new Set(),AC=null,ovT=null;
+const T={run:false,left:300,end:0,iv:null,wait:false};
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+const mins=()=>{const c=cur();return(c&&c.nm&&c.nm.mins)||5};
+function showTime(){$('clock').textContent=fmt(Math.max(0,Math.ceil(T.left)));$('tgo').textContent=T.run?'Pause':'Start'}
+function stop(){clearInterval(T.iv);T.run=false}
+function resetTimer(){stop();stopAlarm();T.wait=false;T.left=Math.round(mins()*60);showTime()}
+function audio(){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}}
+let MG=null,alarmIv=null;
+const pref=()=>S.prefs||(S.prefs={kind:'beeps',loop:false});
+function tone(f,t,dur,type,vol,sus){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.value=f;o.connect(g);g.connect(MG);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.015);
+  if(sus){g.gain.setValueAtTime(vol,t+dur-.04);g.gain.linearRampToValueAtTime(0,t+dur)}
+  else g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.start(t);o.stop(t+dur+.02);
+}
+function sweep(t){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type='triangle';o.connect(g);g.connect(MG);
+  o.frequency.setValueAtTime(600,t);
+  for(let i=0;i<4;i++)o.frequency.linearRampToValueAtTime(i%2?600:1000,t+(i+1)*.5);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.3,t+.03);
+  g.gain.setValueAtTime(.3,t+1.9);g.gain.linearRampToValueAtTime(0,t+2);
+  o.start(t);o.stop(t+2.02);
+}
+const SND={
+  beeps:{name:'Beeps',len:1.3,play:t=>[0,.35,.7].forEach((d,i)=>tone(i===2?1046:784,t+d,.3,'sine',.4))},
+  chime:{name:'Chime',len:2,play:t=>[523,659,784,1046].forEach((f,i)=>tone(f,t+i*.25,1,'sine',.35))},
+  bell:{name:'Bell',len:2.6,play:t=>[1,2.4,3.8].forEach((m,i)=>tone(440*m,t,2.2,'sine',.3/(i+1)))},
+  buzzer:{name:'Buzzer',len:1.6,play:t=>[0,.7].forEach(d=>tone(180,t+d,.55,'sawtooth',.22,true))},
+  siren:{name:'Siren',len:2,play:sweep},
+  alarm:{name:'Alarm clock',len:1.6,play:t=>{for(let i=0;i<8;i++)tone(1400,t+i*.18,.09,'square',.13,true)}}
+};
+function stopAlarm(){
+  clearInterval(alarmIv);alarmIv=null;$('astop').hidden=true;
+  if(MG){try{MG.gain.cancelScheduledValues(0);MG.gain.value=0}catch(e){}MG=null}
+}
+function playSound(loop){
+  audio();if(!AC)return;
+  stopAlarm();
+  MG=AC.createGain();MG.connect(AC.destination);
+  const s=SND[pref().kind]||SND.beeps;
+  const once=()=>s.play(AC.currentTime+.02);
+  once();
+  if(loop){alarmIv=setInterval(once,(s.len+.4)*1000);$('astop').hidden=false}
+}
+function initSound(){
+  const p=pref();
+  $('skind').innerHTML=Object.entries(SND).map(([k,v])=>`<option value="${k}" ${k===(p.kind||'beeps')?'selected':''}>${v.name}</option>`).join('');
+  $('sloop').checked=!!p.loop;
+}
+function flash(){const f=$('flash');f.classList.remove('on');void f.offsetWidth;f.classList.add('on')}
+function go(){
+  if(T.left<=0)T.left=mins()*60;
+  audio();T.wait=false;T.end=Date.now()+T.left*1000;T.run=true;
+  clearInterval(T.iv);T.iv=setInterval(tick,250);showTime();
+}
+function tick(){
+  T.left=(T.end-Date.now())/1000;
+  if(T.left<=0){stop();finish()}
+  showTime();
+}
+function showMoves(moves,c){
+  if(!moves.length)return false;
+  const nm=id=>(c.nm.stations.find(s=>s.id===id)||{name:'?'}).name;
+  $('rotList').innerHTML=moves.map((m,i)=>`<li style="animation-delay:${i*.18}s"><b>${esc(m.team)}</b><span>${esc(nm(m.from))}</span><i>→</i><span>${esc(nm(m.to))}</span></li>`).join('');
+  $('rot').classList.add('show');
+  clearTimeout(ovT);$('rotx').textContent=alarmIv?'Stop sound':'OK';if(!alarmIv)ovT=setTimeout(closeRot,7000);
+  return true;
+}
+function closeRot(){
+  $('rot').classList.remove('show');clearTimeout(ovT);stopAlarm();
+  if(T.wait){T.wait=false;go()}
+}
+function doRotate(d){
+  const c=cur();if(!c||!c.named)return false;
+  const moves=rotate(c,d).filter(m=>m.from!==m.to);
+  MOVED=new Set(moves.map(m=>m.team));save();render();MOVED=new Set();
+  return showMoves(moves,c);
+}
+function finish(){
+  const c=cur();if(!c||!c.named)return;
+  flash();if($('snd').checked)playSound($('sloop').checked);
+  T.left=mins()*60;
+  const shown=doRotate(1);
+  if($('rep').checked){if(shown)T.wait=true;else go()}
+  showTime();
+}
+$('tgo').onclick=()=>{
+  const c=cur();if(!c||!c.named)return;
+  if(T.run){T.left=Math.max(0,(T.end-Date.now())/1000);stop()}else go();
+  showTime();
+};
+$('trs').onclick=resetTimer;
+$('mins').onchange=e=>{const c=cur();if(!c||!c.nm)return;c.nm.mins=Math.max(.5,+e.target.value||5);save();if(!T.run)resetTimer()};
+$('ord').onchange=e=>{
+  const c=cur();if(!c||!c.nm)return;
+  c.nm.order=e.target.value.trim();save();
+  e.target.style.borderColor=!c.nm.order||orderNums(c)?'':'var(--individual)';
+};
+$('skind').onchange=e=>{pref().kind=e.target.value;save();playSound(false)};
+$('sloop').onchange=e=>{pref().loop=e.target.checked;save()};
+$('stest').onclick=()=>playSound($('sloop').checked);
+$('astop').onclick=stopAlarm;
+$('rotx').onclick=closeRot;
+$('rot').onclick=e=>{if(e.target.id==='rot')closeRot()};
+if(!S.current||!S.classes[S.current])S.current=Object.keys(S.classes)[0]||null;
+if(S.current)$('setup').open=false;
+initSound();render();resetTimer();
+</script>
+</body>
+</html>
